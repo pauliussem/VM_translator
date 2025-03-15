@@ -11,6 +11,7 @@ function_names = []
 used_labels = []
 my_list_of_lines = []
 call_counter = 0
+static_counter = 0
 
 #TODO: Read necessary lines from a file and divide each line into a different list with split values.
 
@@ -94,7 +95,7 @@ def handling_labels(line):
         my_list_of_lines.append(f'// {my_string}\n({line[1]})\n')
 
 
-# TODO: Check where operation goto heads and append my_list_of_lines with relevant assembly code.
+# TODO: Check where operation goto heads and append my_list_of_lines with relevant assembly instructions.
 
 def handling_goto(line):
     global my_list_of_lines
@@ -109,7 +110,7 @@ def handling_goto(line):
 
 
 # TODO: Check syntax of a function and raise error if something is wrong.
-#  Else append my_list_of_lines with relevant assembly code.
+#  Else append my_list_of_lines with relevant assembly instructions.
 
 def handling_functions(line):
     global my_list_of_lines
@@ -158,7 +159,7 @@ def handling_call(line):
     if len(line) > 3:
         raise SyntaxError(f'In line "{my_string}".')
 
-    # Checking if called function exists. If it does append my_list_of_lines with relevant values.
+    # Checking if called function exists. If it does append my_list_of_lines with relevant assembly instructions.
 
     if line[1] not in function_names:
         raise KeyError(f'There is no such function called "{line[1]}"')
@@ -174,7 +175,7 @@ def handling_call(line):
         call_counter += 1
 
 
-# TODO: Check syntax of return. If it's ok append my_list_of_lines with relevant assembly code.
+# TODO: Check syntax of return. If it's ok append my_list_of_lines with relevant assembly instructions.
 
 def handling_return(line):
     global my_list_of_lines
@@ -193,8 +194,6 @@ def handling_return(line):
                        f'//restoring ARG\n@3\nD=A\n@13\nA=M-D\nD=M\n@ARG\nM=D\n'
                        f'//restoring LCL\n@4\nD=A\n@13\nA=M-D\nD=M\n@LCL\nM=D\n'
                        f'//goto return address\n@14\nA=M\n0;JMP\n')
-                   # f'//LCL reposition\n@SP\nD=M\n@LCL\nM=D\n@14\nA=M\n0;JMP\n')
-
 
 #TODO: Check which memory access command is initialized and depending on memory location name
 # append my_list_of_lines with relevant assembly code.
@@ -202,6 +201,7 @@ def handling_return(line):
 
 def handling_memory_access(line):
     global my_list_of_lines
+    global static_counter
     my_string = ' '.join(map(str,line))
 
     # Checking if 3rd value of memory access command is an integer, else raising ValueError.
@@ -215,23 +215,30 @@ def handling_memory_access(line):
 
     # "Push" part:
     if line[0] == "push":
-        if line[1] not in ("constant", "temp", *(MEMORY_LOCATION_NAMES_TUPLE)):
+        if line[1] not in ("constant", "temp", "static", *(MEMORY_LOCATION_NAMES_TUPLE)):
             raise KeyError(f'In line "{my_string}" key "{line[1]}" is not recognized.')
         elif line[1] == "constant":
             my_list_of_lines.append(f"// {my_string}\n@{line[2]}\nD=A\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
         elif line[1] in MEMORY_LOCATION_NAMES_TUPLE:
-            my_list_of_lines.append(f"// {my_string}\n@{MEMORY_LOCATION_NAMES_DICT[line[1]]}\nD=M\n@{line[2]}\nA=D+A\nD=M\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
+            my_list_of_lines.append(f"// {my_string}\n@{MEMORY_LOCATION_NAMES_DICT[line[1]]}\nD=M\n@{line[2]}\nA=D+A\n"
+                                    f"D=M\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
+        elif line[1] == "static":
+            my_list_of_lines.append(f'// {my_string}\n@static.{line[2]}\nD=M\n@SP\nA=M\nM=D\n@SP\nM=M+1\n')
         else:
             my_list_of_lines.append(f"// {my_string}\n@{my_int + 5}\nD=M\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
 
     # "Pop" part:
     else:
-        if line[1] not in ("constant", "temp", *(MEMORY_LOCATION_NAMES_TUPLE)):
+        if line[1] not in ("constant", "temp", "static", *(MEMORY_LOCATION_NAMES_TUPLE)):
             raise KeyError(f'In line "{my_string}" key "{line[1]}" is not recognized.')
         elif line[1] == "constant":
             my_list_of_lines.append(f"// {my_string}\n@{my_int}\nD=A\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
         elif line[1] in MEMORY_LOCATION_NAMES_TUPLE:
-            my_list_of_lines.append(f"// {my_string}\n@{MEMORY_LOCATION_NAMES_DICT[line[1]]}\nD=M\n@{my_int}\nA=D+A\nD=A\n@13\nM=D\n@SP\nM=M-1\nA=M\nD=M\n@13\nA=M\nM=D\n")
+            my_list_of_lines.append(f"// {my_string}\n@{MEMORY_LOCATION_NAMES_DICT[line[1]]}\nD=M\n@{my_int}\nA=D+A\n"
+                                    f"D=A\n@13\nM=D\n@SP\nM=M-1\nA=M\nD=M\n@13\nA=M\nM=D\n")
+        elif line[1] == "static":
+            my_list_of_lines.append(f'// {my_string}\n@SP\nAM=M-1\nD=M\n@static.{static_counter}\nM=D\n')
+            static_counter += 1
         else:
             if my_int+5 < 13 and my_int >= 0:
                 my_list_of_lines.append(f"// {my_string}\n@{my_int + 5}\n@SP\nM=M-1\nA=M\nD=M\n@{my_int + 5}\nM=D\n")
@@ -277,18 +284,20 @@ def handling_arith_commands(line, line_index, my_list):
 def main():
     global my_list_of_lines
 
+    # Append my_list_of_lines with assigned memory locations for memory segments.
+    my_list_of_lines.append(f'@256\nD=A\n@SP\nM=D\n@500\nD=A\n@LCL\nM=D\n@600\nD=A\n@ARG\nM=D\n'
+                            f'@700\nD=A\n@THIS\nM=D\n@800\nD=A\n@THAT\nM=D\n')
+
     # Handling file after file path is entered. Assembly code is appended to my_list_of_lines.
     file_path = os.path.join(input("Please enter file path (without quotes): "))
     check_commands(creating_a_list_with_necessary_lines(file_path))
 
-    # Using my_list_of_lines creating new file with same name, but .asm extension.
+    # Creating new file with the same name, but .asm extension.
     file_name = os.path.basename(file_path).split('/')[-1]
     asm_file = file_name.replace(".txt", ".asm")
 
-    with open(asm_file, "w") as file:
+    with open(asm_file, "a") as file:
         temp_list = [''.join(my_list_of_lines)]
         file.write(' '.join(temp_list))
 
 main()
-
-
