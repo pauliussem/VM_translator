@@ -1,7 +1,9 @@
+// Test file with VM language commands to compute Fibonacci sequence n-th element.
+
 function Sys.init 0
     push constant 6
-
 // computes 6th element of fibonacci sequence
+
     call Main.fibonacci 1
     goto WHILE
 
